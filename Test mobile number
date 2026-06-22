@@ -1,0 +1,80 @@
+import telebot
+import re
+import os
+import threading
+import time
+
+BOT_TOKEN = "8806195529:AAGEaaxcIyGAEVsHuUw3VK6xY1i-4hgNqZY"
+TARGET_CHANNEL = "@BqHBkNWQ1"
+bot = telebot.TeleBot(BOT_TOKEN)
+COUNT_FILE = "count.txt"
+counter_lock = threading.Lock()
+
+def get_counter():
+    if not os.path.exists(COUNT_FILE): return 1
+    with open(COUNT_FILE, "r") as f:
+        content = f.read().strip()
+        return int(content) if content.isdigit() else 1
+
+def save_counter(count):
+    with open(COUNT_FILE, "w") as f: f.write(str(count))
+
+@bot.message_handler(commands=['reset'])
+def reset_counter(message):
+    save_counter(1)
+    bot.reply_to(message, "🔄 ક્રમ ફરીથી 001 થી શરૂ થશે.")
+
+@bot.message_handler(commands=['set'])
+def ask_set_counter(message):
+    msg = bot.reply_to(message, "🔢 તમે કેટલા ક્રમથી શરૂ કરવા માંગો છો? તે નંબર લખો:")
+    bot.register_next_step_handler(msg, process_set_counter)
+
+def process_set_counter(message):
+    try:
+        if message.text.isdigit():
+            new_val = int(message.text)
+            save_counter(new_val)
+            bot.reply_to(message, f"✅ સફળ! હવે ક્રમ {new_val:03d} થી શરૂ થશે.")
+        else:
+            bot.reply_to(message, "⚠️ ભૂલ! મહેરબાની કરીને ફક્ત આંકડો (Number) લખો.")
+    except Exception as e:
+        bot.reply_to(message, f"ભૂલ આવી: {e}")
+
+@bot.message_handler(content_types=['video', 'document', 'audio', 'photo'])
+def handle_media(message):
+    if str(message.chat.id) == TARGET_CHANNEL:
+        return
+
+    with counter_lock:
+        try:
+            orig = message.caption if message.caption else ""
+            if not orig and message.document:
+                orig = message.document.file_name if message.document.file_name else ""
+
+            new_caption = re.sub(r'[〘\[].*?(Vid|Pdf)\s*Id\s*:\s*\d+', '', orig, flags=re.IGNORECASE)
+            new_caption = re.sub(r'✨ Powered By:.*', '', new_caption, flags=re.DOTALL | re.IGNORECASE)
+            new_caption = re.sub(r'Extracted By.*?➤.*?𝐀𝐒𝐔𝐑.*?🇮🇳', '', new_caption, flags=re.IGNORECASE)
+            new_caption = new_caption.replace("🖤 Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝", "")
+            
+            new_caption = "\n".join([line for line in new_caption.split('\n') if line.strip() != ""])
+            
+            count = get_counter()
+            prefix = "〘📓〙Pdf Id" if message.document else "〘🎥〙Vid Id"
+            
+            new_caption = f"{prefix} : {count:03d}\n{new_caption.strip()}\n\n<b>✨ Powered By: @cmcreatbot</b>"
+
+            if message.video:
+                bot.send_video(TARGET_CHANNEL, message.video.file_id, caption=new_caption, parse_mode="HTML")
+            elif message.document:
+                bot.send_document(TARGET_CHANNEL, message.document.file_id, caption=new_caption, parse_mode="HTML")
+
+            save_counter(count + 1)
+            time.sleep(4) 
+        except Exception as e:
+            if "429" in str(e):
+                time.sleep(15)
+            else:
+                print(f"ભૂલ: {e}")
+
+print("🚀 બોટ ચાલુ છે...")
+bot.infinity_polling()
