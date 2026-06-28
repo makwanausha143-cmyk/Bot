@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, CommandHandler, ContextTypes, CallbackQueryHandler
 
 # --- કોન્ફિગરેશન ---
-TOKEN = '8835968464:AAHmdZLKtIaIguaWCrGAcMhKhVlH63wdHno'
+TOKEN = '8835968464:AAF_TimXj5Vre_buXzhWYbV1VgMPxtjGSJk'
 YOUR_CHAT_ID = 5306025504
 GROUP_ID = -1003912250139
 
