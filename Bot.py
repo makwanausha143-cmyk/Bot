@@ -55,7 +55,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if id_match:
             target_id = int(id_match.group(1))
             # યુઝરને મેસેજ મોકલો
-            sent_msg = await context.bot.send_message(chat_id=target_id, text=f"💬 એડમિન: {message.text}")
+            sent_msg = await context.bot.send_message(chat_id=target_id, text=f" {message.text}")
             save_message(target_id, "Admin", message.text, "Admin")
             
             # ડિલીટ બટન સાથે કન્ફર્મેશન
