@@ -42,69 +42,63 @@ app = Flask(__name__)
 
 # ---------------- BOT LOGIC ----------------
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("નમસ્તે! બોટ કાર્યરત છે.")
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.message
     if not message: return
 
-    # ૧. એડમિનનો રિપ્લાય (યુઝરને મેસેજ મોકલવા માટે)
+    # ૧. એડમિન રિપ્લાય (યુઝરને મોકલવા માટે)
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_text = message.reply_to_message.caption or message.reply_to_message.text or ""
         id_match = re.search(r"ID:\s*(\d+)", original_text)
         
         if id_match:
             target_id = int(id_match.group(1))
-            await context.bot.send_message(chat_id=target_id, text=f"💬 એડમિન: {message.text}")
+            # યુઝરને મેસેજ મોકલો
+            sent_msg = await context.bot.send_message(chat_id=target_id, text=f"💬 એડમિન: {message.text}")
             save_message(target_id, "Admin", message.text, "Admin")
-            await message.reply_text("✅ જવાબ મોકલાઈ ગયો છે.")
+            
+            # ડિલીટ બટન સાથે કન્ફર્મેશન
+            kb = [[InlineKeyboardButton("🗑️ ડિલીટ કરો", callback_data=f"del_{target_id}_{sent_msg.message_id}")]]
+            await message.reply_text("✅ જવાબ મોકલાઈ ગયો છે.", reply_markup=InlineKeyboardMarkup(kb))
         return
 
-    # ૨. યુઝરનો મેસેજ (તમને મોકલવા અને સેવ કરવા માટે)
+    # ૨. યુઝરનો મેસેજ
     if chat.id != YOUR_CHAT_ID:
         user_name = message.from_user.first_name
         user_id = message.from_user.id
         text = message.text or "Media/Other"
-        
         save_message(user_id, user_name, text, "User")
-
-        info = f"👤 નામ: {user_name}\n🆔 ID: {user_id}\n💬 મેસેજ: {text}"
         
-        keyboard = [[InlineKeyboardButton("📜 બધી હિસ્ટ્રી જુઓ", callback_data=f"hist_{user_id}")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        info = f"👤 નામ: {user_name}\n🆔 ID: {user_id}\n💬 મેસેજ: {text}"
+        kb = [[InlineKeyboardButton("📜 હિસ્ટ્રી જુઓ", callback_data=f"hist_{user_id}")]]
+        await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info, reply_markup=InlineKeyboardMarkup(kb))
 
-        await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info, reply_markup=reply_markup)
+# ---------------- CALLBACKS ----------------
+async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data.split("_") # del_user_id_msg_id
+    try:
+        await context.bot.delete_message(chat_id=int(data[1]), message_id=int(data[2]))
+        await query.edit_message_text("🗑️ મેસેજ ડિલીટ કરી દેવાયો છે.")
+    except Exception as e:
+        await query.answer(f"ભૂલ: {e}")
 
 async def history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     user_id = int(query.data.split("_")[1])
-    
     messages = get_full_history(user_id)
-    if not messages:
-        await query.edit_message_text(text="કોઈ હિસ્ટ્રી નથી.")
-        return
-
-    history_text = f"📜 યુઝર {user_id} સાથેની ચેટ:\n\n"
+    history_text = f"📜 યુઝર {user_id} ની ચેટ:\n\n"
     for name, msg, s_type in messages:
         history_text += f"{'👨‍💻' if s_type == 'Admin' else '👤'} {name}: {msg}\n"
-    
-    if len(history_text) > 4000:
-        for i in range(0, len(history_text), 4000):
-            await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=history_text[i:i+4000])
-    else:
-        await query.edit_message_text(text=history_text)
+    await query.edit_message_text(history_text)
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     Thread(target=lambda: app.run(host="0.0.0.0", port=8080)).start()
-    
     app_bot = ApplicationBuilder().token(TOKEN).build()
-    app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(CallbackQueryHandler(delete_callback, pattern="^del_"))
     app_bot.add_handler(CallbackQueryHandler(history_callback, pattern="^hist_"))
     app_bot.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), handle_message))
-    
     print("બોટ સક્રિય છે...")
     app_bot.run_polling()
