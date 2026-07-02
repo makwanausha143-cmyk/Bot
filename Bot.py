@@ -22,7 +22,7 @@ app = Flask(__name__)
 # ---------------- START COMMAND ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button = KeyboardButton(
-        text="📱 મોબાઇલ નંબર શેર કરો",
+        text="join group",
         request_contact=True
     )
     keyboard = ReplyKeyboardMarkup(
