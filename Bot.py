@@ -34,7 +34,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "નમસ્તે! હું તમારી શું મદદ કરી શકું !!! join grup ઉપર ક્લિક કરો",
         reply_markup=keyboard
     )
-
+async def delete_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    cursor.execute('SELECT message_id FROM msg_logs WHERE chat_id = ?', (chat_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=row[0])
+        except: pass
+    cursor.execute('DELETE FROM msg_logs WHERE chat_id = ?', (chat_id,))
+    conn.commit()
+    await update.message.reply_text("બધા મેસેજ ડિલીટ કરી દેવામાં આવ્યા છે.")
 # ---------------- DELETE BUTTON ----------------
 async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
