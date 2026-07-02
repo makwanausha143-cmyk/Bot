@@ -31,7 +31,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         one_time_keyboard=True
     )
     await update.message.reply_text(
-        "join group ઉપર ક્લિક કરો",
+        "join group ઉપર ક્લિક કરો ત્યારબાદ લિંક ન મળે તો મેસેજ કરો",
         reply_markup=keyboard
     )
 
