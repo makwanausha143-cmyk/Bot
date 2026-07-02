@@ -64,7 +64,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=YOUR_CHAT_ID,
             text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}"
         )
-        await message.reply_text("આભાર! તમારો નંબર મળી ગયો છે.", reply_markup=ReplyKeyboardRemove())
+        await message.reply_text("આભાર!", reply_markup=ReplyKeyboardRemove())
         return
 
     # 2. એડમિન રિપ્લાય
