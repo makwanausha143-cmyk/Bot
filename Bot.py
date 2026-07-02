@@ -33,7 +33,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "નમસ્તે! હું તમારી શું મદદ કરી શકું !!! join grup ઉપર ક્લિક કરો",
         reply_markup=keyboard
-    )
+    ) 
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    message = update.message
+    
+    # અહીં મેસેજ ID સેવ કરો
+    if message:
+        save_message(chat.id, message.message_id)
+        # તમે તમારા બોટ દ્વારા જે મેસેજ મોકલો છો, તેનો ID પણ સેવ કરવો પડે
+        # જે મેસેજ તમે રિપ્લાયમાં મોકલો છો, તેને send_message પછી save_message() માં ઉમેરો.
 async def delete_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     cursor.execute('SELECT message_id FROM msg_logs WHERE chat_id = ?', (chat_id,))
