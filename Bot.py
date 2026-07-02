@@ -64,6 +64,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=YOUR_CHAT_ID,
             text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}"
         )
+        try:
+            await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+        except Exception as e:
+            print(f"મેસેજ ડિલીટ કરવામાં ભૂલ: {e}")
         await message.reply_text("આભાર!", reply_markup=ReplyKeyboardRemove())
         return
 
