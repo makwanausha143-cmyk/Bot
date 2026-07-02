@@ -1,23 +1,30 @@
 import os
-import re
+import sqlite3
 from flask import Flask
 from threading import Thread
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
     filters,
     CommandHandler,
     ContextTypes,
-    CallbackQueryHandler,
 )
-
 # ---------------- CONFIG ----------------
 TOKEN = "8835968464:AAGjhE8p4KPd2fGUNoJCc3ZM8RwaqxCzGy8"
 YOUR_CHAT_ID = 5306025504
 GROUP_ID = -1003912250139
+# ડેટાબેઝ સેટઅપ
+conn = sqlite3.connect('messages.db', check_same_thread=False)
+cursor = conn.cursor()
+cursor.execute('CREATE TABLE IF NOT EXISTS msg_logs (chat_id INTEGER, message_id INTEGER)')
+conn.commit()
 
 app = Flask(__name__)
+# ---------------- HELPER FUNCTIONS ----------------
+def save_message(chat_id, message_id):
+    cursor.execute('INSERT INTO msg_logs VALUES (?, ?)', (chat_id, message_id))
+    conn.commit()
 
 # ---------------- START COMMAND ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -34,26 +41,40 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "નમસ્તે! હું તમારી શું મદદ કરી શકું !!! join grup ઉપર ક્લિક કરો",
         reply_markup=keyboard
     ) 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    message = update.message
-    
-    # અહીં મેસેજ ID સેવ કરો
-    if message:
-        save_message(chat.id, message.message_id)
-        # તમે તમારા બોટ દ્વારા જે મેસેજ મોકલો છો, તેનો ID પણ સેવ કરવો પડે
-        # જે મેસેજ તમે રિપ્લાયમાં મોકલો છો, તેને send_message પછી save_message() માં ઉમેરો.
 async def delete_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     cursor.execute('SELECT message_id FROM msg_logs WHERE chat_id = ?', (chat_id,))
     rows = cursor.fetchall()
+    
+    count = 0
     for row in rows:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=row[0])
-        except: pass
+            count += 1
+        except:
+            pass
+            
     cursor.execute('DELETE FROM msg_logs WHERE chat_id = ?', (chat_id,))
     conn.commit()
-    await update.message.reply_text("બધા મેસેજ ડિલીટ કરી દેવામાં આવ્યા છે.")
+    await update.message.reply_text(f"✅ કુલ {count} મેસેજ ડિલીટ કરી દેવામાં આવ્યા છે.")
+
+# ---------------- MAIN HANDLER ----------------
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    if not message: return
+
+    # મેસેજ ID ડેટાબેઝમાં સેવ કરો
+    save_message(message.chat_id, message.message_id)
+
+    # જો કોન્ટેક્ટ હોય તો એડમિનને મોકલો અને મેસેજ ડિલીટ કરો
+    if message.contact:
+        phone = message.contact.phone_number
+        await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=f"📞 નંબર: {phone}")
+        try:
+            await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+        except: pass
+        await message.reply_text("આભાર! નંબર મળી ગયો છે.", reply_markup=ReplyKeyboardRemove())
+        return
 # ---------------- DELETE BUTTON ----------------
 async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
