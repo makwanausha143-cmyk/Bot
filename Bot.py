@@ -31,7 +31,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         one_time_keyboard=True
     )
     await update.message.reply_text(
-        "નમસ્તે! તમારી ઓળખ ચકાસવા માટે કૃપા કરીને તમારો મોબાઇલ નંબર શેર કરો.",
+        "નમસ્તે! હું તમારી શું મદદ કરી શકું !!! join grup ઉપર ક્લિક કરો",
         reply_markup=keyboard
     )
 
