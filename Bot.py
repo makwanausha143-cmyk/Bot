@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 # ---------------- CONFIG ----------------
-TOKEN = "8835968464:AAGMZbkRPSlF-u4TfhuXEPmgvE2ZdKbHXKY"
+TOKEN = "8835968464:AAHgkDrHqcDrNHKK7pq-vaA7L467eEOT_uM"
 YOUR_CHAT_ID = 5306025504
 GROUP_ID = -1003912250139
 
