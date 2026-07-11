@@ -1,14 +1,9 @@
 import os
 import re
+import asyncio
 from flask import Flask
 from threading import Thread
-from telegram import (
-    Update, 
-    InlineKeyboardButton, 
-    InlineKeyboardMarkup, 
-    KeyboardButton, 
-    ReplyKeyboardMarkup
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -63,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
 
-    # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
+        # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
     if message.contact:
         phone = message.contact.phone_number
         
@@ -73,13 +68,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}"
         )
         
-        # કોન્ટેક્ટ મેસેજ ડિલીટ કરો
+        # આ લાઈન યુઝર દ્વારા મોકલાયેલા કોન્ટેક્ટ મેસેજને તરત જ ડિલીટ કરી દેશે
         try:
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
         except Exception as e:
             print(f"મેસેજ ડિલીટ કરવામાં ભૂલ: {e}")
+
+        # યુઝરને કન્ફર્મેશન આપો
         return
         
+
     # 2. એડમિન રિપ્લાય
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
@@ -87,8 +85,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if not target_id:
             id_match = re.search(r"ID:\s*(\d+)", original_msg)
-            if id_match: 
-                target_id = int(id_match.group(1))
+            if id_match: target_id = int(id_match.group(1))
 
         if target_id:
             try:
@@ -97,6 +94,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 if message.photo:
                     sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True)
+                    async def auto_delete():
+                        await asyncio.sleep(10)
+                        try:
+                            await context.bot.delete_message(chat_id=target_id, message_id=sent_msg.message_id)
+                        except Exception:
+                            pass
+                    asyncio.create_task(auto_delete())
                 elif message.video:
                     sent_msg = await context.bot.send_video(chat_id=target_id, video=message.video.file_id, caption=text_content, protect_content=True)
                 elif message.document:
@@ -115,24 +119,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.id == GROUP_ID:
         caption = f"💬 ગ્રુપમાં નવો મેસેજ:\n👤 નામ: {message.from_user.first_name}\n💬 મેસેજ: {message.text or ''}"
         await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=GROUP_ID, message_id=message.message_id, caption=caption if not message.text else None)
-        if message.text: 
-            await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=caption)
+        if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=caption)
         return
 
     # 4. પ્રાઈવેટ યુઝર
     if chat.id != YOUR_CHAT_ID:
         info = f"👤 નામ: {message.from_user.first_name}\n🆔 ID: {message.from_user.id}\n💬 મેસેજ: {message.text or ''}"
         await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=chat.id, message_id=message.message_id, caption=info if not message.text else None)
-        if message.text: 
-            await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info)
+        if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info)
+
+
 
 # ---------------- FLASK & MAIN ----------------
 @app.route("/")
-def home(): 
-    return "Bot is running!"
+def home(): return "Bot is running!"
 
-def run_flask(): 
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+def run_flask(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
 if __name__ == "__main__":
     Thread(target=run_flask).start()
