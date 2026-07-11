@@ -111,7 +111,10 @@ def run_flask(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
 if __name__ == "__main__":
     Thread(target=run_flask).start()
-    app_bot = ApplicationBuilder().token(TOKEN).build()
+    
+    # job_queue(True) અહીં ઉમેર્યું છે
+    app_bot = ApplicationBuilder().token(TOKEN).job_queue(True).build()
+    
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CallbackQueryHandler(delete_callback, pattern="^del_"))
     
