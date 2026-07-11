@@ -120,17 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=chat.id, message_id=message.message_id, caption=info if not message.text else None)
         if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info)
 
-# મીડિયા હેન્ડલરમાં ફોટો માટે ફેરફાર
-if message.photo:
-    # છેલ્લો ફોટો (સૌથી સારી ક્વોલિટીનો) મેળવો
-    photo_id = message.photo[-1].file_id
-    # has_spoiler=True ઉમેરવાથી તે ક્લિક કર્યા પછી જ ખુલશે
-    bot.send_photo(target_chat, photo_id, caption=final_caption, parse_mode="HTML", message_thread_id=target_thread, has_spoiler=True)
 
-elif message.video:
-    # વિડિયો માટે પણ તમે has_spoiler=True વાપરી શકો છો
-    bot.send_video(target_chat, message.video.file_id, caption=final_caption, parse_mode="HTML", message_thread_id=target_thread, has_spoiler=True)
-                   
 
 # ---------------- FLASK & MAIN ----------------
 @app.route("/")
