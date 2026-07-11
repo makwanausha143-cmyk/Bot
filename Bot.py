@@ -19,6 +19,14 @@ GROUP_ID = -1003912250139
 
 app = Flask(__name__)
 
+# મેસેજ ડિલીટ કરવા માટેનું ફંક્શન
+async def delete_msg(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    try:
+        await context.bot.delete_message(chat_id=job.chat_id, message_id=job.data)
+    except Exception as e:
+        print(f"ડિલીટ કરવામાં ભૂલ: {e}")
+
 # ---------------- START COMMAND ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button = KeyboardButton(text="join group", request_contact=True)
@@ -44,7 +52,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message: return
 
-    # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
+    # 1. કોન્ટેક્ટ હેન્ડલિંગ
     if message.contact:
         phone = message.contact.phone_number
         await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}")
@@ -52,11 +60,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
         return
 
-    # 2. એડમિન રિપ્લાય
+    # 2. એડમિન રિપ્લાય (ફોટો/વિડિયો માટે સ્પોઈલર અને ઓટો-ડિલીટ)
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
         target_id = GROUP_ID if "ગ્રુપમાં નવો મેસેજ:" in original_msg else None
-        
         id_match = re.search(r"ID:\s*(\d+)", original_msg)
         if id_match: target_id = int(id_match.group(1))
 
@@ -65,7 +72,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text_content = message.text or message.caption or ""
                 sent_msg = None
                 
-                # અહીં has_spoiler=True ઉમેર્યું છે
                 if message.photo:
                     sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True, has_spoiler=True)
                 elif message.video:
@@ -76,8 +82,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     sent_msg = await context.bot.send_message(chat_id=target_id, text=text_content, protect_content=True)
 
                 if sent_msg:
+                    # 10 સેકન્ડ પછી ઓટો-ડિલીટ
+                    context.job_queue.run_once(delete_msg, 10, chat_id=target_id, data=sent_msg.message_id)
                     keyboard = [[InlineKeyboardButton("Delete 🗑️", callback_data=f"del_{target_id}_{sent_msg.message_id}")]]
-                    await message.reply_text("✅ મેસેજ મોકલી દીધો છે.", reply_markup=InlineKeyboardMarkup(keyboard))
+                    await message.reply_text("✅ મેસેજ મોકલી દીધો છે (10 સેકન્ડમાં ઓટો ડિલીટ થશે).", reply_markup=InlineKeyboardMarkup(keyboard))
             except Exception as e:
                 await message.reply_text(f"❌ ભૂલ: {e}")
         return
@@ -110,5 +118,5 @@ if __name__ == "__main__":
     all_media = filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.CONTACT
     app_bot.add_handler(MessageHandler(all_media & (~filters.COMMAND), handle_message))
     
-    print("બોટ શરૂ થઈ રહ્યો છે...")
+    print("🚀 બોટ સફળતાપૂર્વક શરૂ થયો છે (10 સેકન્ડ ઓટો-ડિલીટ મોડ)...")
     app_bot.run_polling(drop_pending_updates=True)
