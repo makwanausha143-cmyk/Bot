@@ -94,8 +94,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 if message.photo:
                     sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True)
-                    async def auto_delete():
-                        await asyncio.sleep(500)
                         try:
                             await context.bot.delete_message(chat_id=target_id, message_id=sent_msg.message_id)
                         except Exception:
