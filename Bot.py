@@ -58,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
 
-        # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
+    # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
     if message.contact:
         phone = message.contact.phone_number
         
@@ -73,11 +73,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
         except Exception as e:
             print(f"મેસેજ ડિલીટ કરવામાં ભૂલ: {e}")
-
-        # યુઝરને કન્ફર્મેશન આપો
         return
         
-
     # 2. એડમિન રિપ્લાય
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
@@ -92,13 +89,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text_content = message.text or message.caption or ""
                 sent_msg = None
                 
+                # અહિયાંથી ઓટો-ડીલીટ વાળો કોડ કાઢી નાખ્યો છે
                 if message.photo:
                     sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True)
-                        try:
-                            await context.bot.delete_message(chat_id=target_id, message_id=sent_msg.message_id)
-                        except Exception:
-                            pass
-                    asyncio.create_task(auto_delete())
                 elif message.video:
                     sent_msg = await context.bot.send_video(chat_id=target_id, video=message.video.file_id, caption=text_content, protect_content=True)
                 elif message.document:
@@ -126,13 +119,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=chat.id, message_id=message.message_id, caption=info if not message.text else None)
         if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info)
 
-
-
 # ---------------- FLASK & MAIN ----------------
 @app.route("/")
-def home(): return "Bot is running!"
+def home(): 
+    return "Bot is running!"
 
-def run_flask(): app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+def run_flask(): 
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
 if __name__ == "__main__":
     Thread(target=run_flask).start()
