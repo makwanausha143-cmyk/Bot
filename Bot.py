@@ -78,18 +78,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. એડમિન રિપ્લાય
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
-        target_id = GROUP_ID if "ગ્રુપમાં નવો મેસેજ:" in original_msg else None
         
-        if not target_id:
-            id_match = re.search(r"ID:\s*(\d+)", original_msg)
-            if id_match: target_id = int(id_match.group(1))
+        # નક્કી કરો કે મેસેજ ગ્રુપનો છે કે પ્રાઇવેટ યુઝરનો
+        target_id = None
+        if "ગ્રુપમાં નવો મેસેજ:" in original_msg:
+            target_id = GROUP_ID
+        else:
+            # પ્રાઇવેટ યુઝરની ID શોધો
+            id_match = re.search(r"🆔 ID:\s*(\d+)", original_msg)
+            if id_match:
+                target_id = int(id_match.group(1))
 
         if target_id:
             try:
                 text_content = message.text or message.caption or ""
                 sent_msg = None
                 
-                # અહિયાંથી ઓટો-ડીલીટ વાળો કોડ કાઢી નાખ્યો છે
                 if message.photo:
                     sent_msg = await context.bot.send_photo(chat_id=target_id, photo=message.photo[-1].file_id, caption=text_content, protect_content=True)
                 elif message.video:
@@ -108,9 +112,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 3. ગ્રુપ મેસેજ
     if chat.id == GROUP_ID:
-        caption = f"💬 ગ્રુપમાં નવો મેસેજ:\n👤 નામ: {message.from_user.first_name}\n💬 મેસેજ: {message.text or ''}"
-        await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=GROUP_ID, message_id=message.message_id, caption=caption if not message.text else None)
-        if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=caption)
+        user = message.from_user
+        user_mention = f"@{user.username}" if user.username else f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
+        
+        caption = (
+            f"💬 ગ્રુપમાં નવો મેસેજ:\n"
+            f"👤 મોકલનાર: {user.first_name}\n"
+            f"🆔 ID: <code>{user.id}</code>\n"
+            f"🔗 યુઝર: {user_mention}\n"
+            f"💬 મેસેજ: {message.text or ''}"
+        )
+        
+        await context.bot.copy_message(
+            chat_id=YOUR_CHAT_ID, 
+            from_chat_id=GROUP_ID, 
+            message_id=message.message_id, 
+            caption=caption if not message.text else None
+        )
+        if message.text: 
+            await context.bot.send_message(
+                chat_id=YOUR_CHAT_ID, 
+                text=caption, 
+                parse_mode="HTML"
+            )
         return
 
     # 4. પ્રાઈવેટ યુઝર
