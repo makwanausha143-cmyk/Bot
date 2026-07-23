@@ -20,9 +20,10 @@ GROUP_ID = -1003912250139
 
 app = Flask(__name__)
 
-# ગ્રુપની માહિતી સેવ કરવા માટેની ડિક્શનરી (મેમરી)
-# આમાં બોટ જે જે ગ્રુપમાં એડમિન હશે તેની યાદી રાખશે
-REGISTERED_GROUPS = {}
+# માત્ર તમારા આ એક જ ગ્રુપની માહિતી રહેશે
+REGISTERED_GROUPS = {
+    GROUP_ID: "મુખ્ય ગ્રુપ (Main Group)"
+}
 
 # ---------------- START COMMAND ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -40,16 +41,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
-# ---------------- ADMINS COMMAND (જે ગ્રુપમાં બોટ છે તેની યાદી મેળવવા) ----------------
+# ---------------- ADMINS COMMAND ----------------
 async def check_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     
-    # જો આ કમાન્ડ એડમિન પ્રાઇવેટ ચેટમાં આપે
     if chat.id == YOUR_CHAT_ID:
-        if not REGISTERED_GROUPS:
-            await update.message.reply_text("❌ હજુ સુધી બોટે કોઈપણ ગ્રુપની માહિતી નોંધી નથી. કૃપા કરીને ગ્રુપમાં જઈને એકવાર /admins કમાન્ડ મોકલો.")
-            return
-        
         text = "📋 **બોટ જે ગ્રુપમાં એડમિન છે તેની યાદી:**\n\n"
         for g_id, g_name in REGISTERED_GROUPS.items():
             text += f"📌 ગ્રુપ નામ: {g_name}\n🆔 ID: <code>{g_id}</code>\n-------------------\n"
@@ -57,13 +53,9 @@ async def check_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, parse_mode="HTML")
         return
 
-    # જો કોઈ ગ્રુપમાં આ કમાન્ડ આપવામાં આવે, તો તે ગ્રુપને રજિસ્ટર કરી લો અને એડમિન્સની યાદી બતાવો
-    if chat.type in ["group", "supergroup"]:
+    # જો તમારા નિર્ધારિત ગ્રુપમાંથી કમાન્ડ આવે તો જ એડમિન્સની યાદી બતાવો
+    if chat.id == GROUP_ID:
         try:
-            # ગ્રુપનું નામ સેવ કરી લો
-            REGISTERED_GROUPS[chat.id] = chat.title
-            
-            # ગ્રુપના એડમિન્સની લિસ્ટ મેળવો
             admins = await context.bot.get_chat_administrators(chat.id)
             admin_list = []
             for admin in admins:
@@ -76,7 +68,7 @@ async def check_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             admin_names = ", ".join(admin_list)
             await update.message.reply_text(
-                f"✅ આ ગ્રુપ બોટમાં રજિસ્ટર થઈ ગયું છે!\n\n👑 **ગ્રુપ એડમિન્સ:**\n{admin_names}"
+                f"✅ ગ્રુપ એડમિન્સની યાદી:\n\n👑 {admin_names}"
             )
         except Exception as e:
             await update.message.reply_text(f"❌ ભૂલ: {e}")
@@ -149,11 +141,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await message.reply_text(f"❌ ભૂલ: {e}")
         return
 
-    # 3. ગ્રુપ મેસેજ
+    # 3. માત્ર નિર્ધારિત ગ્રુપના મેસેજ જ ફોરવર્ડ થશે (બીજા ગ્રુપના નહીં)
     if chat.id == GROUP_ID:
-        # ગ્રુપ ઓટોમેટિક રજિસ્ટર કરી લો
-        REGISTERED_GROUPS[chat.id] = chat.title
-        
         user = message.from_user
         user_mention = f"@{user.username}" if user.username else f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
         
@@ -179,8 +168,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # 4. પ્રાઈવેટ યુઝર
-    if chat.id != YOUR_CHAT_ID:
+    # 4. પ્રાઈવેਟ યુઝર (અન્ય ગ્રુપના મેસેજ અહીં ઇગ્નોર થઈ જશે)
+    if chat.type == "private" and chat.id != YOUR_CHAT_ID:
         info = f"👤 નામ: {message.from_user.first_name}\n🆔 ID: {message.from_user.id}\n💬 મેસેજ: {message.text or ''}"
         await context.bot.copy_message(chat_id=YOUR_CHAT_ID, from_chat_id=chat.id, message_id=message.message_id, caption=info if not message.text else None)
         if message.text: await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=info)
@@ -197,10 +186,8 @@ if __name__ == "__main__":
     Thread(target=run_flask).start()
     app_bot = ApplicationBuilder().token(TOKEN).build()
     
-    # કમાન્ડ હેન્ડલર્સ
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("admins", check_admins))
-    
     app_bot.add_handler(CallbackQueryHandler(delete_callback, pattern="^del_"))
     
     all_media = filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.CONTACT
