@@ -79,12 +79,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
         
-        # નક્કી કરો કે મેસેજ ગ્રુપનો છે કે પ્રાઇવેટ યુઝરનો
+        # અહીં ખાસ ચકાસણી કરીએ કે મેસેજ ગ્રુપનો છે કે કેમ
         target_id = None
+        
+        # જો ઓરિજિનલ મેસેજમાં "ગ્રુપમાં નવો મેસેજ:" લખેલું હોય તો ટાર્ગેટ ગ્રુપ જ બનશે
         if "ગ્રુપમાં નવો મેસેજ:" in original_msg:
             target_id = GROUP_ID
         else:
-            # પ્રાઇવેટ યુઝરની ID શોધો
+            # જો પ્રાઇવેટ યુઝર હોય તો તેની ID શોધો
             id_match = re.search(r"🆔 ID:\s*(\d+)", original_msg)
             if id_match:
                 target_id = int(id_match.group(1))
@@ -105,7 +107,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 if sent_msg:
                     keyboard = [[InlineKeyboardButton("Delete 🗑️", callback_data=f"del_{target_id}_{sent_msg.message_id}")]]
-                    await message.reply_text("✅ મેસેજ મોકલી દીધો છે.", reply_markup=InlineKeyboardMarkup(keyboard))
+                    await message.reply_text("✅ મેસેજ ગ્રુપમાં મોકલી દીધો છે.", reply_markup=InlineKeyboardMarkup(keyboard))
             except Exception as e:
                 await message.reply_text(f"❌ ભૂલ: {e}")
         return
