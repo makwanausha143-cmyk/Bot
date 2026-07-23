@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 
 # ---------------- CONFIG ----------------
-TOKEN = "8835968464:AAH-fKBxEW-f2zRTz9WlDJO--6YbgXoT8JM"
+TOKEN = "8835968464:AAEPAGE8kiqJBe3N6N7M_pNtTAwbCOA5djE"
 YOUR_CHAT_ID = 5306025504
 GROUP_ID = -1003912250139
 
